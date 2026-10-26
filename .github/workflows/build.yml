@@ -49,9 +49,10 @@ jobs:
           if [ -z "$KEYSTORE_BASE64" ]; then
             echo "::error::Secret KEYSTORE_BASE64 is missing"; exit 1
           fi
-          # Secrets set from Windows may end with \r\n: strip it before use.
-          printf '%s' "$KEYSTORE_BASE64" | tr -d '\r\n ' | base64 -d > android/upload-keystore.jks
-          pw=$(printf '%s' "$KEYSTORE_PASSWORD" | tr -d '\r\n')
+          # Secrets piped from Windows PowerShell can carry a BOM, NULs or CRLF:
+          # keep only base64 characters / the password's alphabet (letters+digits).
+          printf '%s' "$KEYSTORE_BASE64" | tr -cd 'A-Za-z0-9+/=' | base64 -d > android/upload-keystore.jks
+          pw=$(printf '%s' "$KEYSTORE_PASSWORD" | tr -cd 'A-Za-z0-9')
           {
             echo "storeFile=upload-keystore.jks"
             echo "storePassword=$pw"
