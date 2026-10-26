@@ -134,7 +134,7 @@ class _ProsScreenState extends State<ProsScreen>
     String text;
     if (loader.loading) {
       text = loader.total > 0
-          ? 'جلب الصفقات ${loader.done} من ${loader.total}…'
+          ? 'فحص ${loader.stage} ${loader.done} من ${loader.total}…'
           : 'جلب المتداولين من Binance…';
     } else if (r != null) {
       text =

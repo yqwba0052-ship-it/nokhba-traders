@@ -13,6 +13,7 @@ class PageLoader extends ChangeNotifier {
   PageResult? result;
   String? error;
   bool loading = false;
+  String stage = '';
   int done = 0;
   int total = 0;
   bool _disposed = false;
@@ -22,11 +23,13 @@ class PageLoader extends ChangeNotifier {
     loading = true;
     error = null;
     done = total = 0;
+    stage = '';
     _notify();
     try {
       result = await _service.loadPage(
         rules,
-        onProgress: (d, t) {
+        onProgress: (s, d, t) {
+          stage = s;
           done = d;
           total = t;
           _notify();

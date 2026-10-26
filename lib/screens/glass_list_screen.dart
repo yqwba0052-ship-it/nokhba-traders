@@ -122,7 +122,7 @@ class _GlassListScreenState extends State<GlassListScreen>
       'الفترة: آخر ${periodLabel(widget.rules.timeRange)}',
     ];
     if (_loader.loading && _loader.total > 0) {
-      parts.add('جلب الصفقات ${_loader.done} من ${_loader.total}');
+      parts.add('فحص ${_loader.stage} ${_loader.done} من ${_loader.total}');
     } else if (r != null) {
       parts.add('${r.traders.length} متداول');
       parts.add('تحديث ${formatTime(r.loadedAt)}');

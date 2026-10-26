@@ -69,7 +69,12 @@ void main() {
     });
 
     test('a trader younger than the period is rejected', () {
-      final t = traders.first; // ~31.7 days old
+      // ~31.7 days old; its copiers lost money, so give them a profit here to
+      // test the age rule alone.
+      final t = Trader.fromListJson({
+        ...fixtureList('list_30D_ROI_hideFullFalse.json').first,
+        'copierPnl': 100,
+      }, '30D');
       expect(passesListRules(t, PageRules.pros('30D'), fixtureNow), isTrue);
       expect(passesListRules(t, PageRules.pros('90D'), fixtureNow), isFalse);
       expect(passesListRules(t, PageRules.year, fixtureNow), isFalse);

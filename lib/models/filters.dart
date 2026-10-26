@@ -55,6 +55,26 @@ bool passesListRules(Trader t, PageRules r, DateTime now) {
   if (aum < MIN_AUM) return false;
   if (age < r.minAgeDays) return false;
   if (r.requireCopyAvailable && !t.isCopyAvailable) return false;
+  if (REQUIRE_COPIERS_PROFIT && !((t.copierPnl ?? 0) > 0)) return false;
+  return true;
+}
+
+/// Profits far bigger than losses, and no very bad day (daily ROI curve).
+bool passesCurveRules(Trader t) {
+  final c = t.curve;
+  if (c == null || c.days == 0) return false;
+  final ratio = c.gainLossRatio;
+  if (ratio == null ? c.gains <= 0 : ratio < MIN_GAIN_LOSS_RATIO) return false;
+  if (c.worstDay > MAX_WORST_DAY_LOSS) return false;
+  return true;
+}
+
+/// From lead-portfolio/detail: leverage class and the copiers' result since
+/// the start (not loaded = not verified = out).
+bool passesDetailRules(Trader t) {
+  if (!t.detailLoaded) return false;
+  if (EXCLUDE_HIGH_LEVERAGE && t.leverageTag == 'HIGH_LEVERAGE') return false;
+  if (REQUIRE_COPIERS_PROFIT && !((t.copierPnlTotal ?? 0) > 0)) return false;
   return true;
 }
 

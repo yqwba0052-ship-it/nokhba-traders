@@ -40,7 +40,35 @@ class TraderDetailsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = trader;
     final period = periodLabel(t.timeRange);
+    final c = t.curve;
+    final ratio = c?.gainLossRatio;
     final stats = <(String, String, Color?)>[
+      (
+        'الأرباح ÷ الخسائر',
+        c == null
+            ? 'غير متوفر'
+            : ratio == null
+            ? 'بلا أيام خاسرة'
+            : '${formatDecimal(ratio)} ضعف',
+        const Color(0xFF22C55E),
+      ),
+      ('أسوأ يوم', formatPercent(c?.worstDay), null),
+      (
+        'الأيام الخاسرة',
+        c == null ? 'غير متوفر' : '${c.losingDays} من ${c.days}',
+        null,
+      ),
+      ('الرافعة', t.leverageLabel, null),
+      (
+        'ربح الناسخين (الفترة)',
+        formatUsd(t.copierPnl),
+        (t.copierPnl ?? 0) > 0 ? const Color(0xFF22C55E) : null,
+      ),
+      (
+        'ربح الناسخين (منذ البداية)',
+        formatUsd(t.copierPnlTotal),
+        (t.copierPnlTotal ?? 0) > 0 ? const Color(0xFF22C55E) : null,
+      ),
       ('العائد ROI', formatSignedPercent(t.roi), const Color(0xFF22C55E)),
       ('الربح PNL', formatUsd(t.pnl), const Color(0xFF22C55E)),
       ('أقصى تراجع', formatPercent(t.mdd), null),
@@ -114,7 +142,7 @@ class TraderDetailsScreen extends StatelessWidget {
             physics: const NeverScrollableScrollPhysics(),
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
-            childAspectRatio: 2.1,
+            childAspectRatio: 1.9,
             children: [
               for (final (label, value, color) in stats)
                 _StatTile(label: label, value: value, color: color),
@@ -173,6 +201,8 @@ class _StatTile extends StatelessWidget {
         children: [
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: ProsColors.muted, fontSize: 12.5),
           ),
           const SizedBox(height: 4),

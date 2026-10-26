@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import '../config.dart';
+import 'curve.dart';
 
 /// Binance sends some numbers as JSON numbers and others as strings.
 double? _toDouble(Object? v) {
@@ -19,6 +20,29 @@ int? _toInt(Object? v) {
 /// Number of days in a Binance time range such as "30D".
 int periodDays(String timeRange) =>
     int.parse(timeRange.substring(0, timeRange.length - 1));
+
+/// ROI points of `chartItems` / chart-data; null when the items are not ROI
+/// (a PNL-sorted list sends a PNL curve in USDT).
+List<double>? roiCurveFromJson(Object? items) {
+  if (items is! List || items.isEmpty) return null;
+  final out = <double>[];
+  for (final item in items) {
+    if (item is! Map || item['dataType'] != 'ROI') return null;
+    final v = _toDouble(item['value']);
+    if (v == null) return null;
+    out.add(v);
+  }
+  return out;
+}
+
+/// Leverage class Binance puts on a trader (detail → tagItemVos), e.g. "HIGH_LEVERAGE".
+String? leverageTagFromDetail(Map<String, dynamic> detail) {
+  for (final tag in detail['tagItemVos'] as List? ?? const []) {
+    final name = (tag as Map)['tagName'] as String?;
+    if (name != null && name.endsWith('_LEVERAGE')) return name;
+  }
+  return null;
+}
 
 /// `data` of GET lead-portfolio/performance (v1/public).
 class Performance {
@@ -42,7 +66,8 @@ class Performance {
   final double? sharpRatio;
 }
 
-/// One lead trader from home-page/query-list, plus its trade counts once loaded.
+/// One lead trader from home-page/query-list, plus what is loaded later
+/// (trade counts, ROI curve, leverage tag).
 class Trader {
   const Trader({
     required this.id,
@@ -58,8 +83,13 @@ class Trader {
     required this.maxCopyCount,
     required this.startTime,
     required this.timeRange,
+    this.copierPnl,
+    this.roiCurve,
     this.totalOrder,
     this.winOrders,
+    this.leverageTag,
+    this.copierPnlTotal,
+    this.detailLoaded = false,
   });
 
   factory Trader.fromListJson(Map<String, dynamic> json, String timeRange) {
@@ -86,6 +116,8 @@ class Trader {
           ? null
           : DateTime.fromMillisecondsSinceEpoch(_toInt(json['startTime'])!),
       timeRange: timeRange,
+      copierPnl: _toDouble(json['copierPnl']),
+      roiCurve: roiCurveFromJson(json['chartItems']),
     );
   }
 
@@ -117,11 +149,35 @@ class Trader {
   /// The period all the numbers above belong to, e.g. "30D".
   final String timeRange;
 
+  /// What the copiers made or lost inside [timeRange] (USDT; query-list and
+  /// performance agree on it).
+  final double? copierPnl;
+
+  /// What the copiers made or lost since the trader started (detail, USDT).
+  final double? copierPnlTotal;
+
+  /// Daily ROI points of [timeRange]; null until loaded for PNL-list traders.
+  final List<double>? roiCurve;
+
   /// Closed trades in [timeRange] (performance.totalOrder); null until loaded.
   final int? totalOrder;
   final int? winOrders;
 
-  Trader withPerformance(Performance p) => Trader(
+  /// "HIGH_LEVERAGE" / "MEDIUM_LEVERAGE" / "LOW_LEVERAGE" (detail), if any.
+  final String? leverageTag;
+
+  /// True once lead-portfolio/detail was read (so a null tag means "no tag").
+  final bool detailLoaded;
+
+  Trader _copy({
+    double? sharpRatio,
+    List<double>? roiCurve,
+    int? totalOrder,
+    int? winOrders,
+    String? leverageTag,
+    double? copierPnlTotal,
+    bool? detailLoaded,
+  }) => Trader(
     id: id,
     nickname: nickname,
     avatarUrl: avatarUrl,
@@ -129,15 +185,37 @@ class Trader {
     pnl: pnl,
     mdd: mdd,
     winRate: winRate,
-    sharpRatio: sharpRatio ?? p.sharpRatio,
+    sharpRatio: sharpRatio ?? this.sharpRatio,
     aum: aum,
     currentCopyCount: currentCopyCount,
     maxCopyCount: maxCopyCount,
     startTime: startTime,
     timeRange: timeRange,
+    copierPnl: copierPnl,
+    roiCurve: roiCurve ?? this.roiCurve,
+    totalOrder: totalOrder ?? this.totalOrder,
+    winOrders: winOrders ?? this.winOrders,
+    leverageTag: leverageTag ?? this.leverageTag,
+    copierPnlTotal: copierPnlTotal ?? this.copierPnlTotal,
+    detailLoaded: detailLoaded ?? this.detailLoaded,
+  );
+
+  Trader withPerformance(Performance p) => _copy(
+    sharpRatio: p.sharpRatio,
     totalOrder: p.totalOrder,
     winOrders: p.winOrders,
   );
+
+  Trader withRoiCurve(List<double> curve) => _copy(roiCurve: curve);
+
+  Trader withDetail(Map<String, dynamic> detail) => _copy(
+    leverageTag: leverageTagFromDetail(detail),
+    copierPnlTotal: _toDouble(detail['copierPnl']),
+    detailLoaded: true,
+  );
+
+  CurveStats? get curve =>
+      roiCurve == null ? null : CurveStats.fromRoi(roiCurve!);
 
   String get binanceUrl => '$BINANCE_TRADER_URL$id';
 
@@ -173,4 +251,13 @@ class Trader {
     if (m <= RISK_MEDIUM_MAX_MDD) return 'متوسطة';
     return 'مرتفعة';
   }
+
+  /// Arabic name of Binance's leverage tag.
+  String get leverageLabel => switch (leverageTag) {
+    'HIGH_LEVERAGE' => 'عالية',
+    'MEDIUM_LEVERAGE' => 'متوسطة (10x–20x)',
+    'LOW_LEVERAGE' => 'منخفضة',
+    null => detailLoaded ? 'بلا تصنيف' : 'غير متوفر',
+    final other => other,
+  };
 }

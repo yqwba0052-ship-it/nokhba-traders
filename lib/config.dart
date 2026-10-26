@@ -16,6 +16,19 @@ const double MIN_AUM = 10000;
 /// أقل عدد صفقات خلال الفترة.
 const int MIN_TOTAL_TRADES = 10;
 
+/// الأرباح مقابل الخسائر: مجموع ارتفاعات الأيام الرابحة ÷ مجموع هبوط الأيام
+/// الخاسرة، من منحنى ROI اليومي في Binance خلال الفترة. 2 = الأرباح ضعف الخسائر.
+const double MIN_GAIN_LOSS_RATIO = 2;
+
+/// أكبر خسارة مسموحة في يوم واحد (% من الرصيد) خلال الفترة.
+const double MAX_WORST_DAY_LOSS = 10;
+
+/// استبعاد من تضع عليه Binance علامة "رافعة عالية" (HIGH_LEVERAGE).
+const bool EXCLUDE_HIGH_LEVERAGE = true;
+
+/// يجب أن يكون ناسخو المتداول رابحين خلال الفترة وأيضاً منذ بدايته (copierPnl > 0).
+const bool REQUIRE_COPIERS_PROFIT = true;
+
 /// كل متداول عمره أقل من هذا يُستبعد من كل الصفحات.
 const int MIN_AGE_DAYS = 7;
 
@@ -38,7 +51,7 @@ const int LIST_PAGES_PER_SORT = 10;
 /// أكبر حجم صفحة تقبله Binance (فُحص: 30).
 const int LIST_PAGE_SIZE = 30;
 
-/// عدد المتداولين الذين يُجلب عدد صفقاتهم في كل دفعة.
+/// عدد المتداولين الذين تُجلب بياناتهم الإضافية في كل دفعة.
 const int PERFORMANCE_BATCH_SIZE = 5;
 
 /// استراحة بين الطلبات حتى لا يحجبنا الخادم.
