@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nokhba_traders/models/trade_stats.dart';
@@ -66,6 +67,31 @@ void main() {
       find.textContaining('الأداء السابق لا يضمن الأرباح القادمة'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('the name and id can be copied to other apps', (tester) async {
+    String? clipboard;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          clipboard = (call.arguments as Map)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    final t = fixtureTraders('list_30D_ROI_hideFullFalse.json', '30D').first;
+    await _show(tester, t, fixtureNow);
+
+    expect(find.byType(SelectableText), findsNWidgets(2)); // name + id
+    await tester.tap(find.text('نسخ الاسم'));
+    await tester.pump();
+    expect(clipboard, '迪亚马特');
+    expect(find.textContaining('تم نسخ الاسم'), findsOneWidget);
+
+    await tester.tap(find.text('نسخ الكل'));
+    await tester.pump();
+    expect(clipboard, '迪亚马特\n${t.id}\n${t.binanceUrl}');
   });
 
   testWidgets('real trades: profit factor, coverage, floating loss, copy', (

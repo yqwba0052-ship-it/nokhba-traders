@@ -7,6 +7,7 @@ import '../models/filters.dart';
 import '../models/trader.dart';
 import '../services/binance_service.dart';
 import '../services/page_loader.dart';
+import '../widgets/copy.dart';
 import '../widgets/format.dart';
 import '../widgets/glass.dart';
 import '../widgets/state_views.dart';
@@ -311,6 +312,7 @@ class _GlassRow extends StatelessWidget {
         type: MaterialType.transparency,
         child: InkWell(
           onTap: () => _open(context),
+          onLongPress: () => copyText(context, trader.nickname, 'الاسم'),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Row(

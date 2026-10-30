@@ -5,6 +5,7 @@ import '../models/filters.dart';
 import '../models/trader.dart';
 import '../services/binance_service.dart';
 import '../services/page_loader.dart';
+import '../widgets/copy.dart';
 import '../widgets/format.dart';
 import '../widgets/state_views.dart';
 import '../widgets/trader_avatar.dart';
@@ -237,6 +238,7 @@ class _ProCard extends StatelessWidget {
             builder: (_) => TraderDetailsScreen(trader: t, now: now),
           ),
         ),
+        onLongPress: () => copyText(context, t.nickname, 'الاسم'),
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(

@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/trader.dart';
 import '../services/app_store.dart';
+import '../widgets/copy.dart';
 import '../widgets/format.dart';
 import '../widgets/trader_avatar.dart';
 import 'pros_screen.dart' show ProsColors;
@@ -220,7 +221,7 @@ class TraderDetailsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          Text(
+          SelectableText(
             t.nickname,
             textAlign: TextAlign.center,
             style: const TextStyle(
@@ -229,10 +230,30 @@ class TraderDetailsScreen extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          Text(
+          SelectableText(
             'معرّف المحفظة: ${t.id}',
             textAlign: TextAlign.center,
             style: const TextStyle(color: ProsColors.muted, fontSize: 12),
+          ),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 4,
+            children: [
+              TextButton.icon(
+                onPressed: () => copyText(context, t.nickname, 'الاسم'),
+                icon: const Icon(Icons.copy_rounded, size: 18),
+                label: const Text('نسخ الاسم'),
+              ),
+              TextButton.icon(
+                onPressed: () => copyText(
+                  context,
+                  '${t.nickname}\n${t.id}\n${t.binanceUrl}',
+                  'الاسم والمعرّف والرابط',
+                ),
+                icon: const Icon(Icons.copy_all_rounded, size: 18),
+                label: const Text('نسخ الكل'),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           Center(
