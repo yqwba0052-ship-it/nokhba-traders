@@ -9,6 +9,14 @@
 | قائمة المتداولين | `POST bapi/futures/v1/friendly/future/copy-trade/home-page/query-list` (أقصى `pageSize` = 30) |
 | عدد الصفقات | `GET bapi/futures/v1/public/future/copy-trade/lead-portfolio/performance?portfolioId=<id>&timeRange=<7D..365D>` → `totalOrder`, `winOrders` |
 | صفحة المتداول | `https://www.binance.com/en/copy-trading/lead-details/<id>` |
+| أرقام المحفظة الرسمية (ROI، PNL، MDD، الفوز، Sharpe، ربح الناسخين) | نفس رابط `performance` لكل فترة (7D/30D/90D/365D) |
+| الصفقات المغلقة (معامل الربحية) | `POST .../friendly/.../lead-portfolio/position-history` (200 في الصفحة؛ تُعتمد فقط إذا طابقت totalOrder وwinOrders بين 90% و110%) |
+| الصفقات المفتوحة (الخسائر العائمة) | `GET .../friendly/.../lead-data/positions?portfolioId=<id>` (فارغ إذا أخفى المتداول صفقاته: يُستبعد) |
+| الرصيد، الحد الأدنى للنسخ، ربح الناسخين منذ البداية | `GET .../friendly/.../lead-portfolio/detail?portfolioId=<id>` |
+| منحنى ROI اليومي (أسوأ يوم) | `chartItems` في القائمة، أو `GET .../public/.../lead-portfolio/chart-data` |
+
+غير متاح في Binance للعامة: نتيجة كل ناسخ على حدة (يُعرض المجموع فقط مع تنبيه).
+نتائج «سجل اختباراتي» تُحفظ على الهاتف فقط، منفصلة عن أرقام Binance.
 
 الفترات المدعومة: 7D و30D و90D و180D و365D. `winRate` و`mdd` و`roi` نسب مئوية جاهزة (73.33 تعني 73.33%).
 

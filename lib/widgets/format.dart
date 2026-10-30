@@ -39,6 +39,21 @@ String formatDecimal(double? v, {int decimals = 2}) =>
 
 String formatInt(int? v) => v == null ? 'غير متوفر' : _group('$v');
 
+/// Nicknames used by more than one portfolio in [traders].
+Set<String> duplicateNames(Iterable<Trader> traders) {
+  final seen = <String>{}, twice = <String>{};
+  for (final t in traders) {
+    if (!seen.add(t.nickname)) twice.add(t.nickname);
+  }
+  return twice;
+}
+
+/// The nickname, plus "#1234" (end of the portfolio id) when it is not unique.
+String displayName(Trader t, Set<String> duplicates) =>
+    duplicates.contains(t.nickname)
+    ? '${t.nickname} #${t.shortId}'
+    : t.nickname;
+
 /// "7 أيام" / "30 يوماً" / "365 يوماً".
 String periodLabel(String timeRange) {
   final n = periodDays(timeRange);

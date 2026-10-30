@@ -64,22 +64,17 @@ void main() {
       }
     });
 
-    test(
-      'passesCurveRules follows MIN_GAIN_LOSS_RATIO and MAX_WORST_DAY_LOSS',
-      () {
-        for (final t in traders) {
-          final c = t.curve!;
-          final ratioOk = c.gainLossRatio == null
-              ? c.gains > 0
-              : c.gainLossRatio! >= MIN_GAIN_LOSS_RATIO;
-          expect(
-            passesCurveRules(t),
-            ratioOk && c.worstDay <= MAX_WORST_DAY_LOSS,
-            reason: t.nickname,
-          );
-        }
-      },
-    );
+    // The profit factor now comes from actual trades (trade_stats_test); the
+    // ROI curve only guards against a very bad day.
+    test('passesCurveRules follows MAX_WORST_DAY_LOSS only', () {
+      for (final t in traders) {
+        expect(
+          passesCurveRules(t),
+          t.curve!.worstDay <= MAX_WORST_DAY_LOSS,
+          reason: t.nickname,
+        );
+      }
+    });
 
     test('copiers losing money are rejected', () {
       final losing = traders.firstWhere((t) => t.copierPnl! < 0);
@@ -119,8 +114,12 @@ void main() {
       });
 
       test('MEDIUM_LEVERAGE with copiers in profit passes', () {
-        final medium = t.withDetail(detail('detail.json', copierPnl: '12.5'));
-        expect(passesDetailRules(medium), isTrue);
+        // the real detail.json hides open positions: rejected for that alone
+        final hidden = t.withDetail(detail('detail.json', copierPnl: '12.5'));
+        expect(passesDetailRules(hidden), isFalse);
+        final shown = detail('detail.json', copierPnl: '12.5')
+          ..['positionShow'] = true;
+        expect(passesDetailRules(t.withDetail(shown)), isTrue);
       });
 
       test('detail not loaded = not verified = rejected', () {

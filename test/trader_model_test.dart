@@ -45,10 +45,14 @@ void main() {
       expect(traders.first.isCopyAvailable, isTrue);
     });
 
-    test('score = roi / (mdd + 5)', () {
-      final t = traders.first;
-      expect(t.score, closeTo(5879.34917381 / (9.7570642 + 5), 1e-9));
-    });
+    test(
+      'the portfolio id is the identity; shortId tells same names apart',
+      () {
+        final t = traders.first;
+        expect(t.shortId, '2145');
+        expect(traders.map((x) => x.id).toSet(), hasLength(traders.length));
+      },
+    );
 
     test('risk label follows max drawdown', () {
       expect(traders.first.riskLabel, 'منخفضة'); // 9.76%

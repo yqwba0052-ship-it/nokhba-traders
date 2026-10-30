@@ -114,7 +114,7 @@ class EmptyView extends StatelessWidget {
             Icon(Icons.search_off_rounded, size: 48, color: color),
             const SizedBox(height: 12),
             Text(
-              'لا يوجد الآن متداول يحقق كل الشروط.\nاسحب للأسفل للتحديث لاحقاً.',
+              'لا يوجد\nلا يوجد الآن متداول يحقق كل الشروط.\nاسحب للأسفل للتحديث لاحقاً.',
               textAlign: TextAlign.center,
               style: TextStyle(color: color, fontSize: 16, height: 1.5),
             ),

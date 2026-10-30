@@ -27,7 +27,9 @@ Future<void> main() async {
         '| صفقات يومية ${t.dailyTrades(now)!.toStringAsFixed(2)} '
         '(${t.totalOrder} خلال ${t.activeDays(now)!.toStringAsFixed(1)} يوم) '
         '| ناسخون ${t.currentCopyCount}/${t.maxCopyCount} '
-        '| score ${t.score.toStringAsFixed(1)}\n  ${t.binanceUrl}',
+        '| معامل الربحية ${t.profitFactor?.toStringAsFixed(2) ?? 'بلا خسائر'} '
+        '| عائمة ${t.floatingLossPct!.toStringAsFixed(2)}% '
+        '| score ${t.scoreAt(now).toStringAsFixed(2)}\n  ${t.binanceUrl}',
       );
     }
   }

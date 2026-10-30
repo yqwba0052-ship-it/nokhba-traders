@@ -8,6 +8,7 @@ import '../services/page_loader.dart';
 import '../widgets/format.dart';
 import '../widgets/state_views.dart';
 import '../widgets/trader_avatar.dart';
+import 'test_log_screen.dart';
 import 'trader_details_screen.dart';
 
 abstract final class ProsColors {
@@ -65,21 +66,37 @@ class _ProsScreenState extends State<ProsScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 14, 16, 2),
-              child: Text(
-                'المحترفون ⭐',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 8, 2),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'المحترفون ⭐',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'سجل اختباراتي',
+                    color: ProsColors.gold,
+                    icon: const Icon(Icons.fact_check_outlined),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const TestLogScreen(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Text(
-                'ربح عالٍ ومخاطرة منخفضة، مرتبون حسب الربح مقابل المخاطرة',
+                'أرباح أضعاف الخسائر، مرتبون حسب الأرباح مقابل الخسائر والمخاطر',
                 style: TextStyle(color: ProsColors.muted, fontSize: 13.5),
               ),
             ),
@@ -186,6 +203,7 @@ class _ProsScreenState extends State<ProsScreen>
               itemBuilder: (context, i) => _ProCard(
                 rank: i + 1,
                 trader: traders[i],
+                name: displayName(traders[i], duplicateNames(traders)),
                 now: result!.loadedAt,
               ),
             ),
@@ -194,10 +212,16 @@ class _ProsScreenState extends State<ProsScreen>
 }
 
 class _ProCard extends StatelessWidget {
-  const _ProCard({required this.rank, required this.trader, required this.now});
+  const _ProCard({
+    required this.rank,
+    required this.trader,
+    required this.name,
+    required this.now,
+  });
 
   final int rank;
   final Trader trader;
+  final String name;
   final DateTime now;
 
   @override
@@ -249,7 +273,7 @@ class _ProCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      t.nickname,
+                      name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(

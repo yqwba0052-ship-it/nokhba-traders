@@ -3,9 +3,12 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'screens/home_screen.dart';
 import 'screens/pros_screen.dart';
+import 'services/app_store.dart';
 import 'services/binance_service.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await appStore.load(); // the owner's test results and copy amount
   runApp(NokhbaApp(service: BinanceService()));
 }
 

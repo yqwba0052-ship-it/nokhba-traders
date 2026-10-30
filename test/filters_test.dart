@@ -8,9 +8,45 @@ import 'helpers.dart';
 void main() {
   final traders = fixtureTraders('list_30D_ROI_hideFullFalse.json', '30D');
   Trader byName(String n) => traders.firstWhere((t) => t.nickname == n);
-  Trader withTrades(Trader t, int total) => t.withPerformance(
-    Performance(timeRange: t.timeRange, totalOrder: total, winOrders: 0),
-  );
+
+  /// Official numbers equal to the list ones, [total] trades, and the given
+  /// profits of the last 30 and 90 days.
+  Trader withTrades(
+    Trader t,
+    int total, {
+    double pnl30 = 100,
+    double pnl90 = 100,
+  }) => t
+      .withPerformance(
+        Performance(
+          timeRange: t.timeRange,
+          totalOrder: total,
+          winOrders: 0,
+          roi: t.roi,
+          pnl: t.pnl,
+          mdd: t.mdd,
+          winRate: t.winRate,
+        ),
+      )
+      .withPerformance(
+        Performance(
+          timeRange: '30D',
+          totalOrder: total,
+          winOrders: 0,
+          roi: t.roi,
+          pnl: pnl30,
+          mdd: t.mdd,
+          winRate: t.winRate,
+        ),
+      )
+      .withPerformance(
+        Performance(
+          timeRange: '90D',
+          totalOrder: total,
+          winOrders: 0,
+          pnl: pnl90,
+        ),
+      );
 
   group('rules of each screen', () {
     test('pros: minimum age equals the chosen period', () {
@@ -93,7 +129,37 @@ void main() {
   });
 
   group('passesTradeRules', () {
-    final t = traders.first; // 30D, older than 30 days
+    // 30D, older than 30 days; its copiers lost money, so give them a profit
+    // here to test the trade rules alone.
+    final t = Trader.fromListJson({
+      ...fixtureList('list_30D_ROI_hideFullFalse.json').first,
+      'copierPnl': 100,
+    }, '30D');
+
+    test('needs Binance official numbers that still pass the rules', () {
+      final rules = PageRules.pros('30D');
+      expect(passesTradeRules(withTrades(t, 50), rules, fixtureNow), isTrue);
+      final worse = withTrades(t, 50).withPerformance(
+        Performance(
+          timeRange: '30D',
+          totalOrder: 50,
+          winOrders: 0,
+          roi: t.roi,
+          pnl: t.pnl,
+          mdd: MAX_MDD + 1, // official drawdown worse than the list said
+          winRate: t.winRate,
+        ),
+      );
+      expect(passesTradeRules(worse, rules, fixtureNow), isFalse);
+    });
+
+    test('must be profitable in both the last 30 and 90 days', () {
+      final rules = PageRules.pros('30D');
+      expect(
+        passesTradeRules(withTrades(t, 50, pnl90: -1), rules, fixtureNow),
+        isFalse,
+      );
+    });
 
     test('needs at least MIN_TOTAL_TRADES', () {
       final rules = PageRules.pros('30D');
@@ -115,9 +181,12 @@ void main() {
   });
 
   test('rankByScore puts the best profit-against-risk first', () {
-    final ranked = rankByScore(traders);
+    final ranked = rankByScore(traders, fixtureNow);
     for (var i = 1; i < ranked.length; i++) {
-      expect(ranked[i - 1].score, greaterThanOrEqualTo(ranked[i].score));
+      expect(
+        ranked[i - 1].scoreAt(fixtureNow),
+        greaterThanOrEqualTo(ranked[i].scoreAt(fixtureNow)),
+      );
     }
   });
 }

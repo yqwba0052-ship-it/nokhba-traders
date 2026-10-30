@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import '../config.dart';
 import 'curve.dart';
+import 'trade_stats.dart';
 
 /// Binance sends some numbers as JSON numbers and others as strings.
 double? _toDouble(Object? v) {
@@ -44,13 +45,19 @@ String? leverageTagFromDetail(Map<String, dynamic> detail) {
   return null;
 }
 
-/// `data` of GET lead-portfolio/performance (v1/public).
+/// `data` of GET lead-portfolio/performance (v1/public): Binance's official
+/// numbers of one portfolio for one period (what its page shows).
 class Performance {
   const Performance({
     required this.timeRange,
     required this.totalOrder,
     required this.winOrders,
     this.sharpRatio,
+    this.roi,
+    this.pnl,
+    this.mdd,
+    this.winRate,
+    this.copierPnl,
   });
 
   factory Performance.fromJson(Map<String, dynamic> json) => Performance(
@@ -58,16 +65,26 @@ class Performance {
     totalOrder: _toInt(json['totalOrder']),
     winOrders: _toInt(json['winOrders']),
     sharpRatio: _toDouble(json['sharpRatio']),
+    roi: _toDouble(json['roi']),
+    pnl: _toDouble(json['pnl']),
+    mdd: _toDouble(json['mdd']),
+    winRate: _toDouble(json['winRate']),
+    copierPnl: _toDouble(json['copierPnl']),
   );
 
   final String timeRange;
   final int? totalOrder;
   final int? winOrders;
   final double? sharpRatio;
+  final double? roi;
+  final double? pnl;
+  final double? mdd;
+  final double? winRate;
+  final double? copierPnl;
 }
 
-/// One lead trader from home-page/query-list, plus what is loaded later
-/// (trade counts, ROI curve, leverage tag).
+/// One lead trader (portfolio) from home-page/query-list, plus what is loaded
+/// later. Identity is the portfolio id, never the nickname or picture.
 class Trader {
   const Trader({
     required this.id,
@@ -90,6 +107,14 @@ class Trader {
     this.leverageTag,
     this.copierPnlTotal,
     this.detailLoaded = false,
+    this.official = false,
+    this.performance = const {},
+    this.positionShow,
+    this.marginBalance,
+    this.minCopyFixedAmount,
+    this.minCopyFixedRatio,
+    this.open,
+    this.trades,
   });
 
   factory Trader.fromListJson(Map<String, dynamic> json, String timeRange) {
@@ -121,11 +146,12 @@ class Trader {
     );
   }
 
+  /// Portfolio id (unique; two portfolios may share a nickname).
   final String id;
   final String nickname;
   final String? avatarUrl;
 
-  /// Percent (5879.3 means 5879.3%).
+  /// Percent (5879.3 means 5879.3%). Official (performance) once [official].
   final double? roi;
 
   /// USDT.
@@ -169,7 +195,34 @@ class Trader {
   /// True once lead-portfolio/detail was read (so a null tag means "no tag").
   final bool detailLoaded;
 
+  /// True once roi/pnl/mdd/winRate/sharpRatio were replaced by Binance's
+  /// official numbers for this portfolio and [timeRange] (performance).
+  final bool official;
+
+  /// Official numbers per period ("7D", "30D", "90D", ...).
+  final Map<String, Performance> performance;
+
+  /// False when the trader hides open positions on Binance.
+  final bool? positionShow;
+
+  /// Trader's own balance (detail.marginBalance, USDT).
+  final double? marginBalance;
+
+  /// Smallest copy amount Binance accepts (detail, USDT): fixed amount / fixed ratio.
+  final double? minCopyFixedAmount;
+  final double? minCopyFixedRatio;
+
+  /// Open positions right now (null until loaded, or when hidden).
+  final OpenPositions? open;
+
+  /// Closed trades of [timeRange] (null until loaded).
+  final TradeStats? trades;
+
   Trader _copy({
+    double? roi,
+    double? pnl,
+    double? mdd,
+    double? winRate,
     double? sharpRatio,
     List<double>? roiCurve,
     int? totalOrder,
@@ -177,14 +230,22 @@ class Trader {
     String? leverageTag,
     double? copierPnlTotal,
     bool? detailLoaded,
+    bool? official,
+    Map<String, Performance>? performance,
+    bool? positionShow,
+    double? marginBalance,
+    double? minCopyFixedAmount,
+    double? minCopyFixedRatio,
+    OpenPositions? open,
+    TradeStats? trades,
   }) => Trader(
     id: id,
     nickname: nickname,
     avatarUrl: avatarUrl,
-    roi: roi,
-    pnl: pnl,
-    mdd: mdd,
-    winRate: winRate,
+    roi: roi ?? this.roi,
+    pnl: pnl ?? this.pnl,
+    mdd: mdd ?? this.mdd,
+    winRate: winRate ?? this.winRate,
     sharpRatio: sharpRatio ?? this.sharpRatio,
     aum: aum,
     currentCopyCount: currentCopyCount,
@@ -198,13 +259,33 @@ class Trader {
     leverageTag: leverageTag ?? this.leverageTag,
     copierPnlTotal: copierPnlTotal ?? this.copierPnlTotal,
     detailLoaded: detailLoaded ?? this.detailLoaded,
+    official: official ?? this.official,
+    performance: performance ?? this.performance,
+    positionShow: positionShow ?? this.positionShow,
+    marginBalance: marginBalance ?? this.marginBalance,
+    minCopyFixedAmount: minCopyFixedAmount ?? this.minCopyFixedAmount,
+    minCopyFixedRatio: minCopyFixedRatio ?? this.minCopyFixedRatio,
+    open: open ?? this.open,
+    trades: trades ?? this.trades,
   );
 
-  Trader withPerformance(Performance p) => _copy(
-    sharpRatio: p.sharpRatio,
-    totalOrder: p.totalOrder,
-    winOrders: p.winOrders,
-  );
+  /// Stores [p]; for this trader's own period it also replaces the list numbers
+  /// with Binance's official ones (the list can lag behind the portfolio page).
+  Trader withPerformance(Performance p) {
+    final all = {...performance, p.timeRange: p};
+    if (p.timeRange != timeRange) return _copy(performance: all);
+    return _copy(
+      performance: all,
+      official: true,
+      roi: p.roi,
+      pnl: p.pnl,
+      mdd: p.mdd,
+      winRate: p.winRate,
+      sharpRatio: p.sharpRatio,
+      totalOrder: p.totalOrder,
+      winOrders: p.winOrders,
+    );
+  }
 
   Trader withRoiCurve(List<double> curve) => _copy(roiCurve: curve);
 
@@ -212,12 +293,23 @@ class Trader {
     leverageTag: leverageTagFromDetail(detail),
     copierPnlTotal: _toDouble(detail['copierPnl']),
     detailLoaded: true,
+    positionShow: detail['positionShow'] as bool?,
+    marginBalance: _toDouble(detail['marginBalance']),
+    minCopyFixedAmount: _toDouble(detail['fixedAmountMinCopyUsd']),
+    minCopyFixedRatio: _toDouble(detail['fixedRadioMinCopyUsd']),
   );
+
+  Trader withOpenPositions(OpenPositions o) => _copy(open: o);
+
+  Trader withTrades(TradeStats s) => _copy(trades: s);
 
   CurveStats? get curve =>
       roiCurve == null ? null : CurveStats.fromRoi(roiCurve!);
 
   String get binanceUrl => '$BINANCE_TRADER_URL$id';
+
+  /// Last 4 digits of the portfolio id, to tell same-name portfolios apart.
+  String get shortId => id.length > 4 ? id.substring(id.length - 4) : id;
 
   double? ageDays(DateTime now) => startTime == null
       ? null
@@ -236,12 +328,48 @@ class Trader {
     return totalOrder! / days;
   }
 
+  /// Share (%) of the active days with at least one closed trade.
+  double? tradingDaysShare(DateTime now) {
+    final days = activeDays(now), s = trades;
+    if (s == null || days == null || days <= 0) return null;
+    return math.min(100, s.tradingDays / days.ceil() * 100);
+  }
+
+  /// Losses of open positions as % of the trader's balance.
+  double? get floatingLossPct {
+    final o = open, b = marginBalance;
+    if (o == null || b == null || b <= 0) return null;
+    return o.floatingLoss / b * 100;
+  }
+
+  /// Everything open ÷ balance (how many times the balance is at risk now).
+  double? get exposure {
+    final o = open, b = marginBalance;
+    if (o == null || b == null || b <= 0) return null;
+    return o.notional / b;
+  }
+
+  /// Realized profit ÷ (realized loss + floating loss), from actual trades.
+  double? get profitFactor => trades?.profitFactor(open?.floatingLoss ?? 0);
+
   bool get isCopyAvailable =>
       currentCopyCount != null &&
       maxCopyCount != null &&
       currentCopyCount! < maxCopyCount!;
 
-  double get score => (roi ?? 0) / ((mdd ?? 0) + SCORE_MDD_OFFSET);
+  /// Profit against losses and risk (see SCORE_MAX_PROFIT_FACTOR in config);
+  /// 0 until the trade data is loaded.
+  double scoreAt(DateTime now) {
+    final s = trades;
+    if (s == null || s.grossProfit <= 0) return 0;
+    final pf = math.min(
+      profitFactor ?? SCORE_MAX_PROFIT_FACTOR,
+      SCORE_MAX_PROFIT_FACTOR,
+    );
+    final regular = (tradingDaysShare(now) ?? 0) / 100;
+    final risk = (mdd ?? MAX_MDD) + (floatingLossPct ?? MAX_FLOATING_LOSS_PCT);
+    return pf * (0.5 + 0.5 * regular) / (1 + risk / 10);
+  }
 
   /// منخفضة / متوسطة / مرتفعة حسب أقصى تراجع.
   String get riskLabel {

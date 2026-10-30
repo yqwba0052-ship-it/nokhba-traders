@@ -189,7 +189,11 @@ class _GlassListScreenState extends State<GlassListScreen>
                   separatorBuilder: (_, _) => const SizedBox(height: gap),
                   itemBuilder: (context, i) => SizedBox(
                     height: extent,
-                    child: _GlassRow(trader: visible[i], now: result!.loadedAt),
+                    child: _GlassRow(
+                      trader: visible[i],
+                      name: displayName(visible[i], duplicateNames(traders)),
+                      now: result!.loadedAt,
+                    ),
                   ),
                 ),
         );
@@ -281,9 +285,14 @@ class _SpinningRefreshState extends State<_SpinningRefresh>
 }
 
 class _GlassRow extends StatelessWidget {
-  const _GlassRow({required this.trader, required this.now});
+  const _GlassRow({
+    required this.trader,
+    required this.name,
+    required this.now,
+  });
 
   final Trader trader;
+  final String name;
   final DateTime now;
 
   void _open(BuildContext context) => Navigator.of(context).push(
@@ -317,7 +326,7 @@ class _GlassRow extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              trader.nickname,
+                              name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(

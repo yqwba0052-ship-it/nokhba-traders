@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../config.dart';
 import '../models/filters.dart';
+import '../models/trade_stats.dart';
 import '../models/trader.dart';
 
 class BinanceException implements Exception {
@@ -52,6 +53,7 @@ class BinanceService {
   final http.Client _client;
   final DateTime Function() _clock;
   final Map<String, Performance> _performance = {};
+  final Map<String, DateTime> _fetchedAt = {};
 
   static const _headers = {
     'Content-Type': 'application/json',
@@ -153,11 +155,12 @@ class BinanceService {
     return byId.values.toList();
   }
 
-  /// Trade counts for one trader in [timeRange] (cached for this session).
+  /// Binance's official numbers of one portfolio for [timeRange]
+  /// (cached for [CACHE_TTL], so a refresh brings fresh numbers).
   Future<Performance> fetchPerformance(String id, String timeRange) async {
     final key = '$id|$timeRange';
     final cached = _performance[key];
-    if (cached != null) return cached;
+    if (cached != null && _fresh(key)) return cached;
     final json = await _send(
       _client.get(
         Uri.parse(
@@ -168,7 +171,59 @@ class BinanceService {
       ),
     );
     final p = Performance.fromJson(json['data'] as Map<String, dynamic>);
+    _fetchedAt[key] = _clock();
     return _performance[key] = p;
+  }
+
+  bool _fresh(String key) {
+    final at = _fetchedAt[key];
+    return at != null && _clock().difference(at) < CACHE_TTL;
+  }
+
+  /// Open positions (lead-data/positions); empty when the trader hides them.
+  Future<OpenPositions> fetchOpenPositions(String id) async {
+    final json = await _send(
+      _client.get(
+        Uri.parse('$BINANCE_API/lead-data/positions?portfolioId=$id'),
+        headers: _headers,
+      ),
+    );
+    return OpenPositions.fromJson(json['data'] as List? ?? const []);
+  }
+
+  /// Closed trades since [start] (lead-portfolio/position-history, newest
+  /// first, 200 per page). Pages go back [HISTORY_LOOKBACK] before [start]
+  /// so trades opened earlier but closed inside the period are included.
+  Future<List<Map<String, dynamic>>> fetchHistory(
+    String id,
+    DateTime start,
+  ) async {
+    final rows = <Map<String, dynamic>>[];
+    final stop = start.subtract(HISTORY_LOOKBACK).millisecondsSinceEpoch;
+    for (var page = 1; page <= HISTORY_MAX_PAGES; page++) {
+      final json = await _send(
+        _client.post(
+          Uri.parse('$BINANCE_API/lead-portfolio/position-history'),
+          headers: _headers,
+          body: jsonEncode({
+            'pageNumber': page,
+            'pageSize': HISTORY_PAGE_SIZE,
+            'portfolioId': id,
+            'sort': 'OPENING',
+          }),
+        ),
+      );
+      final list = ((json['data'] as Map?)?['list'] as List? ?? const [])
+          .cast<Map<String, dynamic>>();
+      rows.addAll(list);
+      final oldest = list.isEmpty ? null : list.last['opened'];
+      if (list.length < HISTORY_PAGE_SIZE || oldest is! num || oldest < stop) {
+        return rows;
+      }
+      await Future<void>.delayed(REQUEST_PAUSE);
+    }
+    // Ran out of pages before reaching the start: the history is incomplete.
+    throw const BinanceException('سجل الصفقات أطول من الحد المسموح.');
   }
 
   /// Daily ROI curve of one trader (lead-portfolio/chart-data, v1/public).
@@ -232,9 +287,11 @@ class BinanceService {
     return out;
   }
 
-  /// Everything one screen needs. Cheapest checks first, so later (one request
-  /// per trader) steps only run for traders still in the list:
-  /// list → daily curve → trade counts → detail (leverage, copiers) → rank.
+  /// Everything one screen needs. Cheapest checks first, so later steps only
+  /// run for traders still in the list: list → daily curve → detail (open
+  /// positions shown, copiers) → floating losses → official numbers of the
+  /// period, 30D and 90D → actual closed trades → rank → at most
+  /// [MAX_TRADERS_PER_SECTION].
   Future<PageResult> loadPage(PageRules rules, {Progress? onProgress}) async {
     final now = _clock();
     final range = rules.timeRange;
@@ -263,26 +320,57 @@ class BinanceService {
       ),
       passesCurveRules,
     );
-    final withTrades = kept(
+    final withDetail = kept(
       await _inBatches(
         withCurve,
-        'الصفقات',
-        (t) async => t.withPerformance(await fetchPerformance(t.id, range)),
-        onProgress,
-      ),
-      (t) => passesTradeRules(t, rules, now),
-    );
-    final withLeverage = kept(
-      await _inBatches(
-        withTrades,
-        'الرافعة',
+        'التفاصيل',
         (t) async => t.withDetail(await fetchDetail(t.id)),
         onProgress,
       ),
       passesDetailRules,
     );
+    final withOpen = kept(
+      await _inBatches(
+        withDetail,
+        'الصفقات المفتوحة',
+        (t) async => t.withOpenPositions(await fetchOpenPositions(t.id)),
+        onProgress,
+      ),
+      passesOpenRules,
+    );
+    final ranges = {range, '30D', '90D'};
+    final withOfficial = kept(
+      await _inBatches(withOpen, 'أرقام Binance الرسمية', (t) async {
+        var out = t;
+        for (final r in ranges) {
+          out = out.withPerformance(await fetchPerformance(t.id, r));
+        }
+        return out;
+      }, onProgress),
+      (t) => passesTradeRules(t, rules, now),
+    );
+    final start = now.subtract(Duration(days: periodDays(range)));
+    final withHistory = kept(
+      await _inBatches(
+        withOfficial,
+        'سجل الصفقات',
+        (t) async => t.withTrades(
+          TradeStats.fromHistory(
+            await fetchHistory(t.id, start),
+            start.toUtc(),
+            officialCount: t.totalOrder,
+            officialWins: t.winOrders,
+          ),
+        ),
+        onProgress,
+      ),
+      passesHistoryRules,
+    );
     return PageResult(
-      traders: rankByScore(withLeverage),
+      traders: rankByScore(
+        withHistory,
+        now,
+      ).take(MAX_TRADERS_PER_SECTION).toList(),
       timeRange: range,
       candidates: candidates.length,
       skipped: skipped,

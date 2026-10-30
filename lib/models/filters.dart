@@ -59,27 +59,32 @@ bool passesListRules(Trader t, PageRules r, DateTime now) {
   return true;
 }
 
-/// Profits far bigger than losses, and no very bad day (daily ROI curve).
+/// No very bad day (daily ROI curve of the period: capital not drained).
 bool passesCurveRules(Trader t) {
   final c = t.curve;
   if (c == null || c.days == 0) return false;
-  final ratio = c.gainLossRatio;
-  if (ratio == null ? c.gains <= 0 : ratio < MIN_GAIN_LOSS_RATIO) return false;
-  if (c.worstDay > MAX_WORST_DAY_LOSS) return false;
-  return true;
+  return c.worstDay <= MAX_WORST_DAY_LOSS;
 }
 
-/// From lead-portfolio/detail: leverage class and the copiers' result since
-/// the start (not loaded = not verified = out).
+/// From lead-portfolio/detail: open positions must be visible (hidden = their
+/// floating losses cannot be checked), copiers' result since the start.
 bool passesDetailRules(Trader t) {
-  if (!t.detailLoaded) return false;
+  if (!t.detailLoaded || t.positionShow != true) return false;
   if (EXCLUDE_HIGH_LEVERAGE && t.leverageTag == 'HIGH_LEVERAGE') return false;
   if (REQUIRE_COPIERS_PROFIT && !((t.copierPnlTotal ?? 0) > 0)) return false;
   return true;
 }
 
-/// Conditions on the trade count (after performance was loaded).
+/// Floating losses of open positions (lead-data/positions).
+bool passesOpenRules(Trader t) {
+  final f = t.floatingLossPct;
+  return f != null && f <= MAX_FLOATING_LOSS_PCT;
+}
+
+/// Official numbers (performance) of the period, re-checked with the list
+/// rules, plus the trade count and profit in both the last 30 and 90 days.
 bool passesTradeRules(Trader t, PageRules r, DateTime now) {
+  if (!t.official || !passesListRules(t, r, now)) return false;
   final total = t.totalOrder;
   if (total == null || total < MIN_TOTAL_TRADES) return false;
   final minDaily = r.minTradesPerDay;
@@ -87,9 +92,27 @@ bool passesTradeRules(Trader t, PageRules r, DateTime now) {
     final daily = t.dailyTrades(now);
     if (daily == null || daily < minDaily) return false;
   }
+  if (REQUIRE_PROFIT_30D_AND_90D) {
+    for (final range in const ['30D', '90D']) {
+      final pnl = t.performance[range]?.pnl;
+      if (pnl == null || pnl <= 0) return false;
+    }
+  }
   return true;
 }
 
-/// Highest "profit against risk" first.
-List<Trader> rankByScore(Iterable<Trader> traders) =>
-    traders.toList()..sort((a, b) => b.score.compareTo(a.score));
+/// Realized profit far above realized + floating losses, from actual trades
+/// whose history matches Binance's own count; not made by a few lucky trades.
+bool passesHistoryRules(Trader t) {
+  final s = t.trades;
+  if (s == null || !s.verified || s.grossProfit <= 0) return false;
+  final pf = t.profitFactor;
+  if (pf != null && pf < MIN_PROFIT_FACTOR) return false;
+  final top3 = s.top3ProfitShare;
+  if (top3 == null || top3 > MAX_TOP3_PROFIT_SHARE) return false;
+  return true;
+}
+
+/// Best profit against losses and risk first.
+List<Trader> rankByScore(Iterable<Trader> traders, DateTime now) =>
+    traders.toList()..sort((a, b) => b.scoreAt(now).compareTo(a.scoreAt(now)));
