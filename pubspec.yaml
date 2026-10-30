@@ -36,12 +36,13 @@ flutter:
         - asset: assets/fonts/Tajawal-ExtraBold.ttf
           weight: 800
 
-# Icon: design/icon_square.png (square, already cropped) + design/icon_foreground.png.
+# Icon: design/icon.png is the owner's picture; `cvpy tool/make_icon.py` cuts it into
+# design/icon_square.png, icon_foreground.png and icon_background.png.
 # After changing them run:  dart run flutter_launcher_icons
 flutter_launcher_icons:
   android: true
   ios: false
   image_path: "design/icon_square.png"
-  adaptive_icon_background: "#0B1220"
+  adaptive_icon_background: "design/icon_background.png"
   adaptive_icon_foreground: "design/icon_foreground.png"
   min_sdk_android: 21

@@ -17,6 +17,15 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 DESIGN = ROOT / "design"
 SIZE = 1024
 
+# Where the glass square is in design/icon.png, as fractions (left, top, right, bottom),
+# measured on the owner's icon (1254x1254). None = find it automatically (works only on
+# a plain one-colour background).
+GLASS_BOX = (0.100, 0.078, 0.890, 0.868)
+# Rounded corners of the glass square (fraction of its side) and its size in the
+# adaptive icon (Android's safe zone is the middle 66%).
+CORNER_RADIUS = 0.17
+FOREGROUND_SCALE = 0.5
+
 
 def crop_to_glass_square(img):
     """Bounding box of everything that differs clearly from the border colour."""
@@ -104,13 +113,32 @@ def main():
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
         elif img.shape[2] == 3:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
-        square = cv2.resize(crop_to_glass_square(img), (SIZE, SIZE), interpolation=cv2.INTER_AREA)
-        # adaptive foreground: the same picture inside Android's safe zone (66%)
+        if GLASS_BOX is None:
+            crop = crop_to_glass_square(img)
+        else:
+            h, w = img.shape[:2]
+            x0, y0, x1, y1 = GLASS_BOX
+            crop = img[int(y0 * h) : int(y1 * h), int(x0 * w) : int(x1 * w)]
+        square = cv2.resize(crop, (SIZE, SIZE), interpolation=cv2.INTER_AREA)
+        # adaptive foreground: the glass square with transparent rounded corners,
+        # inside Android's safe zone so round launcher masks keep the glass edge
+        rounded = square.copy()
+        mask = np.zeros((SIZE, SIZE), np.uint8)
+        r = int(SIZE * CORNER_RADIUS)
+        cv2.rectangle(mask, (r, 0), (SIZE - r, SIZE), 255, -1)
+        cv2.rectangle(mask, (0, r), (SIZE, SIZE - r), 255, -1)
+        for cx, cy in [(r, r), (SIZE - r, r), (r, SIZE - r), (SIZE - r, SIZE - r)]:
+            cv2.circle(mask, (cx, cy), r, 255, -1, cv2.LINE_AA)
+        rounded[:, :, 3] = cv2.min(rounded[:, :, 3], cv2.GaussianBlur(mask, (5, 5), 0))
         fg = np.zeros((SIZE, SIZE, 4), np.uint8)
-        inner = int(SIZE * 0.66)
+        inner = int(SIZE * FOREGROUND_SCALE)
         off = (SIZE - inner) // 2
-        fg[off : off + inner, off : off + inner] = cv2.resize(square, (inner, inner), interpolation=cv2.INTER_AREA)
-        print("cropped", source)
+        fg[off : off + inner, off : off + inner] = cv2.resize(rounded, (inner, inner), interpolation=cv2.INTER_AREA)
+        # adaptive background: the picture's own soft glow, blurred (no shapes)
+        bg = cv2.GaussianBlur(cv2.resize(img, (SIZE, SIZE), interpolation=cv2.INTER_AREA), (0, 0), 80)
+        bg[:, :, 3] = 255
+        cv2.imwrite(str(DESIGN / "icon_background.png"), bg)
+        print("cropped", source, "| also wrote", DESIGN / "icon_background.png")
     else:
         square = draw_temporary(transparent_bg=False)
         fg = draw_temporary(transparent_bg=True)
