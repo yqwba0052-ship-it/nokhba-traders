@@ -10,12 +10,14 @@ void main() {
   Trader byName(String n) => traders.firstWhere((t) => t.nickname == n);
 
   /// Official numbers equal to the list ones, [total] trades, and the given
-  /// profits of the last 30 and 90 days.
+  /// profits of the trader and of the copiers in the last 30 and 90 days.
   Trader withTrades(
     Trader t,
     int total, {
     double pnl30 = 100,
     double pnl90 = 100,
+    double? copiers30 = 100,
+    double? copiers90 = 100,
   }) => t
       .withPerformance(
         Performance(
@@ -37,6 +39,7 @@ void main() {
           pnl: pnl30,
           mdd: t.mdd,
           winRate: t.winRate,
+          copierPnl: copiers30,
         ),
       )
       .withPerformance(
@@ -45,6 +48,7 @@ void main() {
           totalOrder: total,
           winOrders: 0,
           pnl: pnl90,
+          copierPnl: copiers90,
         ),
       );
 
@@ -151,6 +155,29 @@ void main() {
         ),
       );
       expect(passesTradeRules(worse, rules, fixtureNow), isFalse);
+    });
+
+    test('copiers must be in profit in both the last 30 and 90 days', () {
+      final rules = PageRules.pros('30D');
+      expect(passesTradeRules(withTrades(t, 50), rules, fixtureNow), isTrue);
+      // the trader profits while the copiers lose: rejected
+      expect(
+        passesTradeRules(withTrades(t, 50, copiers30: -1), rules, fixtureNow),
+        isFalse,
+      );
+      expect(
+        passesTradeRules(
+          withTrades(t, 50, copiers90: -0.01),
+          rules,
+          fixtureNow,
+        ),
+        isFalse,
+      );
+      // no copier data = not verified = not met
+      expect(
+        passesTradeRules(withTrades(t, 50, copiers90: null), rules, fixtureNow),
+        isFalse,
+      );
     });
 
     test('must be profitable in both the last 30 and 90 days', () {

@@ -98,6 +98,14 @@ bool passesTradeRules(Trader t, PageRules r, DateTime now) {
       if (pnl == null || pnl <= 0) return false;
     }
   }
+  // The trader may profit while the copiers lose: their total must be
+  // positive in both periods too (missing = not verified = out).
+  if (REQUIRE_COPIERS_PROFIT_30D_AND_90D) {
+    for (final range in const ['30D', '90D']) {
+      final copiers = t.performance[range]?.copierPnl;
+      if (copiers == null || copiers <= 0) return false;
+    }
+  }
   return true;
 }
 

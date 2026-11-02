@@ -58,6 +58,11 @@ void main() {
     expect(find.text('ربح كل الناسخين (الفترة)'), findsOneWidget);
     expect(find.text('ربح كل الناسخين (منذ البداية)'), findsOneWidget);
     expect(find.textContaining('لا تنشر نتيجة كل ناسخ'), findsOneWidget);
+    // copiers' totals of 30 and 90 days are not loaded here, and Binance never
+    // publishes how many copiers won: never a made-up number
+    expect(find.text('ربح كل الناسخين (30 يوماً)'), findsOneWidget);
+    expect(find.text('ربح كل الناسخين (90 يوماً)'), findsOneWidget);
+    expect(find.text('الناسخون الرابحون منهم'), findsOneWidget);
     // no trade history loaded: never a made-up profit factor
     expect(find.text('بيانات غير كافية'), findsWidgets);
     // detail.json hides open positions

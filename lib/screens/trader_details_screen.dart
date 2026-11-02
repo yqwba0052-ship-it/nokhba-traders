@@ -170,6 +170,19 @@ class TraderDetailsScreen extends StatelessWidget {
         formatUsd(t.copierPnlTotal),
         (t.copierPnlTotal ?? 0) > 0 ? _green : null,
       ),
+      for (final (range, label) in const [
+        ('30D', 'ربح كل الناسخين (30 يوماً)'),
+        ('90D', 'ربح كل الناسخين (90 يوماً)'),
+      ])
+        (
+          label,
+          t.performance[range]?.copierPnl == null
+              ? _na
+              : formatUsd(t.performance[range]!.copierPnl),
+          (t.performance[range]?.copierPnl ?? 0) > 0 ? _green : _red,
+        ),
+      // Binance publishes only the copiers' total, never each copier's result.
+      ('الناسخون الرابحون منهم', _na, null),
       ('العائد ROI', formatSignedPercent(t.roi), _green),
       ('الربح PNL', formatUsd(t.pnl), _green),
       ('أقصى تراجع', formatPercent(t.mdd), null),
